@@ -267,8 +267,8 @@ function MyApp() {
   const [organized, setOrganized] = React.useState(false);
   const [selected, setSelected] = React.useState(null);
   const [groupView, setGroupView] = React.useState<ParsedLog[] | null>(null);
-  const [groupList, setGroupList] = React.useState<ParsedLog[] | null>(null); // the currently viewed runtime group (array)
-  const [groupIndex, setGroupIndex] = React.useState(0); // current index in that group
+  const [groupList, setGroupList] = React.useState<ParsedLog[] | null>(null);
+  const [groupIndex, setGroupIndex] = React.useState(0);
   const [ignoreNonRuntimes, setIgnoreNonRuntimes] = React.useState(false);
   const [uploadFileName, setUploadFileName] = React.useState<string>("No file selected");
 

@@ -322,8 +322,6 @@ function MyApp() {
         <a onClick={() => setGroupView(null)}>
           <b>&lt;&lt;&lt;</b>
         </a>
-        <a onClick={() => window.location.reload()}>Refresh</a>
-        <br />
         <br />
         {groupView.map((e, i) => (
           <React.Fragment key={i}>

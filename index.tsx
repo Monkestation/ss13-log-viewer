@@ -252,10 +252,27 @@ function UploadButton({ onUpload }) {
     inputRef.current?.click();
   };
 
+  const handleExampleClick = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch("example_log.json");
+      if (!res.ok) throw new Error("Failed to load example_log.json");
+      const text = await res.text();
+      const lines = text.split(/\r?\n/).filter(Boolean);
+      const parsed = lines.map(safeJSONParse).filter(Boolean).map(parseLogLine);
+      onUpload(parsed, "example_log.json");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
-    <label className="white inlineblock">
+    <label className="inlineblock">
       <a href="#" onClick={handleUploadClick}>
         Upload Log
+      </a>
+      <a href="#" onClick={handleExampleClick} style={{ padding: "1px 2px" }} title="Load Example Log File">
+        (?)
       </a>
       <input ref={inputRef} type="file" style={{ display: "none" }} onChange={handleFile} />
     </label>
@@ -265,7 +282,9 @@ function UploadButton({ onUpload }) {
 function MyApp() {
   const [logs, setLogs] = React.useState<ParsedLog[]>([]);
   const [organized, setOrganized] = React.useState(false);
-  const [selected, setSelected] = React.useState(null);
+  const [sortLogs, setSortLogs] = React.useState(false);
+  const [sortAscending, setSortAscending] = React.useState(false);
+  const [selected, setSelected] = React.useState<ParsedLog>(null);
   const [groupView, setGroupView] = React.useState<ParsedLog[] | null>(null);
   const [groupList, setGroupList] = React.useState<ParsedLog[] | null>(null);
   const [groupIndex, setGroupIndex] = React.useState(0);
@@ -273,15 +292,25 @@ function MyApp() {
   const [uploadFileName, setUploadFileName] = React.useState<string>("No file selected");
 
   const runtimes = React.useMemo(() => {
-    const map = new Map();
+    const map = new Map<string, ParsedLog[]>();
     for (const e of logs) {
       if (ignoreNonRuntimes && !e.msg?.includes("runtime error")) continue;
       const key = e.data?.file ? `${e.data.file}:${e.data.line}` : e.title;
       if (!map.has(key)) map.set(key, []);
-      map.get(key).push(e);
+      map.get(key)!.push(e);
     }
-    return map;
-  }, [logs, ignoreNonRuntimes]);
+
+    let entries = Array.from(map.entries());
+    if (sortLogs)
+      entries = entries.sort(([aKey], [bKey]) => {
+        const result = aKey.localeCompare(bKey);
+        return result;
+      });
+
+    if (sortAscending) entries.reverse();
+
+    return new Map(entries);
+  }, [logs, ignoreNonRuntimes, sortLogs, sortAscending]);
 
   // back button thing
   React.useEffect(() => {
@@ -356,22 +385,31 @@ function MyApp() {
       {/* YES I KNOW THERES A BETTER WAY TO DO THIS BUT I CANNOT BE BOTHERED RIGHT NOWWWWWWWWW AAAAAAAAAAAAAA */}
       {logs.filter((e) => e.msg.startsWith("runtime error")).length} Runtimes |{" "}
       {new Set(logs.filter((e) => e.msg.startsWith("runtime error")).map((e) => e.title)).size} Unique <br />
-      <a onClick={() => setOrganized(!organized)}>{!organized ? "Linear" : "Organized"}</a>|
+      <b>Filters/Sorts:</b> <a onClick={() => setOrganized(!organized)}>{!organized ? "Linear" : "Organized"}</a> |{" "}
       <a onClick={() => setIgnoreNonRuntimes((v) => !v)}>
         {ignoreNonRuntimes ? "Show non-runtimes" : "Ignore non-runtimes"}
-      </a>
+      </a>{" "}
+      | <a onClick={() => setSortAscending((a) => !a)}>{sortAscending ? "Descending" : "Ascending"}</a> |{" "}
+      <a onClick={() => setSortLogs((a) => !a)}>{sortLogs ? "Alphabetically" : "In Order"}</a>
       <hr />
       {!organized &&
-        logs
-          .filter((e) => (ignoreNonRuntimes ? e.msg.startsWith("runtime error") : true))
-          .map((e, i) => (
+        (() => {
+          let filtered = logs.filter((e) => (ignoreNonRuntimes ? e.msg.startsWith("runtime error") : true));
+          if (sortLogs)
+            filtered = filtered.sort((aKey, bKey) => {
+              const result = aKey.title.localeCompare(bKey.title);
+              return result;
+            });
+          if (sortAscending) filtered.reverse();
+          return filtered.map((e, i) => (
             <React.Fragment key={i}>
               <a onClick={() => setSelected(e)}>
                 <b>[{e.ts.toLocaleString()}]</b> {e.title}
               </a>
               <br />
             </React.Fragment>
-          ))}
+          ));
+        })()}
       {organized &&
         Array.from(runtimes.entries()).map(([k, list], i) => (
           <React.Fragment key={i}>

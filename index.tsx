@@ -155,6 +155,15 @@ function dataToText<T = object>(e: T, omit: (keyof T)[]) {
   return sports;
 }
 
+function dataToMarkdown<T = object>(e: T, omit: (keyof T)[]) {
+  let sports = "";
+  for (const a of Object.keys(e as object)) {
+    if (omit.includes(a as keyof T)) continue;
+    sports += `${a}: \`${e[a]}\`\n`;
+  }
+  return sports;
+}
+
 function ExtraDataDisplay({ data, omit }) {
   if (!data || typeof data !== "object") return null;
 
@@ -233,7 +242,10 @@ function LogDetail({
         <React.Fragment>
           <hr />
           <h2>Extra Data</h2>
-          <a onClick={() => navigator.clipboard.writeText(dataToText(entry.data, ["desc"]))}>Copy</a> |{" "}
+          Omits <code>"desc"</code>
+          <br />
+          <a onClick={() => navigator.clipboard.writeText(dataToText(entry.data, ["desc"]))}>Copy</a>
+          <a onClick={() => navigator.clipboard.writeText(dataToMarkdown(entry.data, ["desc"]))}>(Markdown)</a> |{" "}
           <a onClick={() => navigator.clipboard.writeText(JSON.stringify(entry.data))}>Copy Raw</a>
           <a onClick={() => navigator.clipboard.writeText(JSON.stringify(entry.data, null, "  "))}>(Formatted)</a>
           <ExtraDataDisplay data={entry.data} omit={["desc"] as keyof ParsedLog[]} />

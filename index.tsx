@@ -90,6 +90,12 @@ function WStateDisplay({ w }) {
   );
 }
 
+function WStateText(w: NonNullable<ParsedLog["wstate"]>) {
+  return (
+    `Tick usage: ${w.tick_usage}\n` + `Tick lag: ${w.tick_lag}\n` + `Time: ${w.time}\n` + `Timestamp: ${w.timestamp}\n`
+  );
+}
+
 function DataEntry({ key, label, value }) {
   if (value !== null && typeof value !== "object") {
     return (
@@ -140,6 +146,15 @@ function DataEntry({ key, label, value }) {
   );
 }
 
+function dataToText<T = object>(e: T, omit: (keyof T)[]) {
+  let sports = "";
+  for (const a of Object.keys(e as object)) {
+    if (omit.includes(a as keyof T)) continue;
+    sports += `${a}: ${e[a]}\n`;
+  }
+  return sports;
+}
+
 function ExtraDataDisplay({ data, omit }) {
   if (!data || typeof data !== "object") return null;
 
@@ -155,6 +170,12 @@ function ExtraDataDisplay({ data, omit }) {
       <br />
     </div>
   );
+}
+
+function logToMarkdown(entry: ParsedLog) {
+  return `[<t:${Math.floor(entry.ts.getTime() / 1000)}:f>/${entry.ts.toUTCString()}]\nTitle: ${entry.title}\n\`\`\`\n${
+    entry.msg
+  }\`\`\``;
 }
 
 function LogDetail({
@@ -178,8 +199,13 @@ function LogDetail({
         <b>&lt;&lt;&lt;</b>
       </a>
       <br />
+      <a onClick={() => navigator.clipboard.writeText(entry.msg)}>Copy Log</a>
+      <a onClick={() => navigator.clipboard.writeText(logToMarkdown(entry))}>(Markdown)</a> |
+      <a onClick={() => navigator.clipboard.writeText(JSON.stringify(entry.originalLine))}>Copy Raw Log</a>
+      <a onClick={() => navigator.clipboard.writeText(JSON.stringify(entry.originalLine, null, "  "))}>(Formatted)</a>
       {inGroup && (
         <>
+          <br />
           <a onClick={() => onNavigate(Math.max(groupIndex - 1, 0))}>Prev</a>
           <a onClick={() => onNavigate(Math.min(groupIndex + 1, total - 1))} style={{ marginLeft: "4px" }}>
             Next
@@ -192,18 +218,13 @@ function LogDetail({
       <br />
       <b>[{entry.ts.toLocaleString()}]</b> {entry.title}
       <br />
-      <div className="runtime">
-        {entry.msg.split("\n").map((line, i) => (
-          <React.Fragment key={i}>
-            <span key={i} className="runtime_line">
-              {line}
-            </span>
-          </React.Fragment>
-        ))}
-      </div>
+      <pre className="runtime">{entry.msg}</pre>
       {!!entry.wstate && (
         <React.Fragment>
           <h2>WState</h2>
+          <a onClick={() => navigator.clipboard.writeText(WStateText(entry.wstate!))}>Copy</a> |{" "}
+          <a onClick={() => navigator.clipboard.writeText(JSON.stringify(entry.wstate))}>Copy Raw</a>
+          <a onClick={() => navigator.clipboard.writeText(JSON.stringify(entry.wstate, null, "  "))}>(Formatted)</a>
           <WStateDisplay w={entry.wstate} />
           <br />
         </React.Fragment>
@@ -212,7 +233,10 @@ function LogDetail({
         <React.Fragment>
           <hr />
           <h2>Extra Data</h2>
-          <ExtraDataDisplay data={entry.data} omit={["desc"] as keyof ParsedLog}></ExtraDataDisplay>
+          <a onClick={() => navigator.clipboard.writeText(dataToText(entry.data, ["desc"]))}>Copy</a> |{" "}
+          <a onClick={() => navigator.clipboard.writeText(JSON.stringify(entry.data))}>Copy Raw</a>
+          <a onClick={() => navigator.clipboard.writeText(JSON.stringify(entry.data, null, "  "))}>(Formatted)</a>
+          <ExtraDataDisplay data={entry.data} omit={["desc"] as keyof ParsedLog[]} />
         </React.Fragment>
       )}
     </div>

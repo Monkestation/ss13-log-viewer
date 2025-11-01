@@ -239,7 +239,7 @@ function LogDetail({
             Next
           </a>
           <span>
-            {groupIndex + 1} of {total} in Group
+            {groupIndex + 1} of {total} in group
           </span>
         </>
       )}
@@ -486,6 +486,8 @@ function MyApp() {
         >
           <b>&lt;&lt;&lt;</b>
         </a>
+        <br />
+        {groupView.length} Entries in group
         <br />
         {groupView.map((e, i) => (
           <React.Fragment key={i}>

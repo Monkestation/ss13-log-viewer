@@ -10,10 +10,14 @@ A React log viewer for TG's style of SS13 logs, primarily oriented around runtim
 - yah dats pretty much it rn
 
 TODO: 
-- [ ] Add a search function
+- [x] Add a search function
 - [ ] Add pagination probably
 - [ ] Try parsing other kinds of logs, not just runtimes.
 - [ ] Parse first line of log properly.
+- [ ] Allow arrow keys in organized menu
+- [ ] Add key combinations for copying and stuff
+- - Hold shift or alt to show keys for buttons.
+- [ ] Add "case sensitive" option for regexs
 
 # LICESNSE
 

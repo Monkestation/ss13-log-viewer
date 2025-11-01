@@ -1,3 +1,5 @@
+const React = globalThis.React as typeof import("react");
+const ReactDOM = globalThis.ReactDOM as unknown as typeof import("react-dom/client");
 interface LogRuntimeData {
   file: string;
   line: number;
@@ -37,7 +39,7 @@ interface ParsedLog {
 }
 
 // utils
-function safeJSONParse(line: string): object | null {
+function safeJSONParse<T>(line: string): T | null {
   try {
     return JSON.parse(line);
   } catch {
@@ -190,23 +192,31 @@ function logToMarkdown(entry: ParsedLog) {
 function LogDetail({
   entry,
   onBack,
+  logIndex,
+  logs,
   groupList,
   groupIndex,
   onNavigate,
 }: {
   entry: ParsedLog;
   onBack: () => void;
+  logIndex: number;
+  logs: ParsedLog[];
   groupList: ParsedLog[];
   groupIndex: number;
   onNavigate: Function;
 }) {
   const inGroup = Array.isArray(groupList) && groupList.length > 1;
   const total = inGroup ? groupList.length : 1;
+  const logsTotal = logs.length;
   return (
     <div>
       <a onClick={onBack}>
         <b>&lt;&lt;&lt;</b>
       </a>
+      <span>
+        Entry #{logIndex + 1} of {logsTotal}
+      </span>
       <br />
       <a onClick={() => navigator.clipboard.writeText(entry.msg)}>Copy Log</a>
       <a onClick={() => navigator.clipboard.writeText(logToMarkdown(entry))}>(Markdown)</a> |{" "}
@@ -257,7 +267,7 @@ function LogDetail({
           <a onClick={() => navigator.clipboard.writeText(dataToMarkdown(entry.data, ["desc"]))}>(Markdown)</a> |{" "}
           <a onClick={() => navigator.clipboard.writeText(JSON.stringify(entry.data))}>Copy Raw</a>
           <a onClick={() => navigator.clipboard.writeText(JSON.stringify(entry.data, null, "  "))}>(Formatted)</a>
-          <ExtraDataDisplay data={entry.data} omit={["desc"] as keyof ParsedLog[]} />
+          <ExtraDataDisplay data={entry.data} omit={["desc"] as unknown as keyof ParsedLog[]} />
         </React.Fragment>
       )}
     </div>
@@ -272,7 +282,7 @@ function UploadButton({ onUpload }) {
     reader.onload = (event) => {
       let result = event.target?.result;
       if (!result) return;
-      let fileContent;
+      let fileContent: string;
 
       if (typeof result === "string") {
         fileContent = result;
@@ -283,8 +293,11 @@ function UploadButton({ onUpload }) {
         return;
       }
 
-      const lines = fileContent.split(/\r?\n/).filter(Boolean);
-      const parsed = lines.map(safeJSONParse).filter(Boolean).map(parseLogLine);
+      const lines: string[] = fileContent.split(/\r?\n/).filter(Boolean);
+      const parsed = lines
+        .map(safeJSONParse<JSONLogLine>)
+        .filter(Boolean)
+        .map((v) => parseLogLine(v!));
       onUpload(parsed, file.name);
     };
 
@@ -304,7 +317,10 @@ function UploadButton({ onUpload }) {
       if (!res.ok) throw new Error("Failed to load example_log.json");
       const text = await res.text();
       const lines = text.split(/\r?\n/).filter(Boolean);
-      const parsed = lines.map(safeJSONParse).filter(Boolean).map(parseLogLine);
+      const parsed = lines
+        .map(safeJSONParse<JSONLogLine>)
+        .filter(Boolean)
+        .map((v) => parseLogLine(v!));
       onUpload(parsed, "example_log.json");
     } catch (err) {
       console.error(err);
@@ -325,16 +341,21 @@ function UploadButton({ onUpload }) {
 }
 
 function MyApp() {
+  // no i will NOT use react router FUCK YOU! :3
   const [logs, setLogs] = React.useState<ParsedLog[]>([]);
   const [organized, setOrganized] = React.useState(false);
   const [sortLogs, setSortLogs] = React.useState(false);
   const [sortAscending, setSortAscending] = React.useState(false);
-  const [selected, setSelected] = React.useState<ParsedLog>(null);
+  const [selected, setSelected] = React.useState<ParsedLog | null>(null);
   const [groupView, setGroupView] = React.useState<ParsedLog[] | null>(null);
   const [groupList, setGroupList] = React.useState<ParsedLog[] | null>(null);
   const [groupIndex, setGroupIndex] = React.useState(0);
   const [ignoreNonRuntimes, setIgnoreNonRuntimes] = React.useState(false);
   const [uploadFileName, setUploadFileName] = React.useState<string>("No file selected");
+
+  const [searchQuery, setSearchQuery] = React.useState<string>("");
+  const [searchUseRegex, setSearchUseRegex] = React.useState<boolean>(false);
+  const searchRef = React.useRef<HTMLInputElement>(null);
 
   const runtimes = React.useMemo(() => {
     const map = new Map<string, ParsedLog[]>();
@@ -359,33 +380,97 @@ function MyApp() {
 
   // back button thing
   React.useEffect(() => {
-    function onPopState(e) {
-      if (selected) {
+    window.history.replaceState({ view: "home" }, "");
+    function onPopState(e: PopStateEvent) {
+      const state = e.state?.view;
+
+      // back from runtime > group view
+      if (state === "group") {
         setSelected(null);
-        window.history.pushState(null, "", window.location.href);
         return;
       }
-      if (groupView) {
+
+      // back from group > home
+      if (state === "home") {
         setGroupView(null);
-        window.history.pushState(null, "", window.location.href);
+        setSelected(null);
         return;
+      }
+
+      if (!state) {
+        setGroupView(null);
+        setSelected(null);
       }
     }
-    window.history.pushState(null, "", window.location.href);
+
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, [selected, groupView]);
+  }, []);
+
+  // key handling:
+  // space - search box
+  // arrow keys (only in runtimes) - navigate between runtimes
+  React.useEffect(() => {
+    function handleKey(e) {
+      if (e.key === "Enter" && !selected && !groupView && !e.target.matches("input, textarea")) {
+        e.preventDefault();
+        searchRef.current?.focus();
+        return;
+      }
+
+      if (e.key === "Backspace" && !e.target.matches("input, textarea")) {
+        e.preventDefault();
+        window.history.back();
+        return;
+      }
+
+      if (!selected) return;
+
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        e.preventDefault();
+
+        // inside groups
+        if (groupList && groupList.length > 1) {
+          if (e.key === "ArrowRight" && groupIndex < groupList.length - 1) {
+            setGroupIndex(groupIndex + 1);
+            setSelected(groupList[groupIndex + 1]);
+          } else if (e.key === "ArrowLeft" && groupIndex > 0) {
+            setGroupIndex(groupIndex - 1);
+            setSelected(groupList[groupIndex - 1]);
+          }
+          return;
+        }
+
+        // const logs = logs.filter((l) => l.msg?.includes("runtime error"));
+        const currentIndex = logs.findIndex((l) => l === selected);
+        if (currentIndex === -1) return;
+
+        if (e.key === "ArrowRight" && currentIndex < logs.length - 1) {
+          setSelected(logs[currentIndex + 1]);
+        } else if (e.key === "ArrowLeft" && currentIndex > 0) {
+          setSelected(logs[currentIndex - 1]);
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [selected, groupList, groupIndex, logs]);
 
   if (selected)
     return (
       <LogDetail
         entry={selected}
         onBack={() => setSelected(null)}
-        groupList={groupList}
+        logs={logs}
+        logIndex={logs.indexOf(selected)}
+        // It will never be null since groupList is set in the onClick for items in the groupView.
+        groupList={groupList!}
         groupIndex={groupIndex}
         onNavigate={(newIndex) => {
           setGroupIndex(newIndex);
-          setSelected(groupList[newIndex]);
+          // same here
+          setSelected(groupList![newIndex]);
         }}
       />
     );
@@ -393,7 +478,12 @@ function MyApp() {
   if (groupView)
     return (
       <div>
-        <a onClick={() => setGroupView(null)}>
+        <a
+          onClick={() => {
+            window.history.replaceState({ view: "home" }, "");
+            setGroupView(null);
+          }}
+        >
           <b>&lt;&lt;&lt;</b>
         </a>
         <br />
@@ -404,6 +494,7 @@ function MyApp() {
               onClick={() => {
                 setGroupList(groupView);
                 setGroupIndex(i);
+                window.history.pushState({ view: "log" }, "");
                 setSelected(e);
               }}
             >
@@ -436,10 +527,45 @@ function MyApp() {
       </a>{" "}
       | <a onClick={() => setSortAscending((a) => !a)}>{sortAscending ? "Descending" : "Ascending"}</a> |{" "}
       <a onClick={() => setSortLogs((a) => !a)}>{sortLogs ? "Alphabetically" : "In Order"}</a>
+      <div style={{ position: "absolute", top: 8, right: 8, textAlign: "right" }}>
+        <input
+          type="text"
+          ref={searchRef}
+          placeholder="Search..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{
+            width: "200px",
+          }}
+        />
+        <input
+          type="checkbox"
+          checked={searchUseRegex}
+          onChange={(e) => setSearchUseRegex(e.target.checked)}
+          style={{ marginRight: "4px" }}
+        />
+        Regex
+      </div>
       <hr />
       {!organized &&
         (() => {
-          let filtered = logs.filter((e) => (ignoreNonRuntimes ? e.msg.startsWith("runtime error") : true));
+          let filtered = logs.filter((e) => {
+            if (ignoreNonRuntimes && !e.msg.startsWith("runtime error")) return false;
+            if (!searchQuery) return true;
+
+            const target = (e.msg ?? "") + " " + (e.title ?? "") + " " + (e.data?.file ?? "");
+            if (searchUseRegex) {
+              try {
+                const regex = new RegExp(searchQuery, "i");
+                return regex.test(target);
+              } catch {
+                return false;
+              }
+            }
+
+            return target.toLowerCase().includes(searchQuery.toLowerCase());
+          });
+
           if (sortLogs)
             filtered = filtered.sort((aKey, bKey) => {
               const result = aKey.title.localeCompare(bKey.title);
@@ -448,7 +574,12 @@ function MyApp() {
           if (sortAscending) filtered.reverse();
           return filtered.map((e, i) => (
             <React.Fragment key={i}>
-              <a onClick={() => setSelected(e)}>
+              <a
+                onClick={() => {
+                  window.history.pushState({ view: "log" }, "");
+                  setSelected(e);
+                }}
+              >
                 <b>[{e.ts.toLocaleString()}]</b> {e.title}
               </a>
               <br />
@@ -456,18 +587,56 @@ function MyApp() {
           ));
         })()}
       {organized &&
-        Array.from(runtimes.entries()).map(([k, list], i) => (
-          <React.Fragment key={i}>
-            <a onClick={() => (list.length === 1 ? setSelected(list[0]) : setGroupView(list))}>
-              <b>[{list[0].ts.toLocaleString()}]</b> {list[0].title}
-            </a>
-            <br />
-          </React.Fragment>
-        ))}
+        Array.from(runtimes.entries())
+          .filter(([k, list]) => {
+            if (!searchQuery) return true;
+
+            if (searchUseRegex) {
+              try {
+                const regex = new RegExp(searchQuery, "i");
+                return (
+                  regex.test(k) ||
+                  list.some(
+                    (e) => regex.test(e.title ?? "") || regex.test(e.msg ?? "") || regex.test(e.data?.file ?? "")
+                  )
+                );
+              } catch {
+                return false;
+              }
+            }
+            const q = searchQuery.toLowerCase();
+            return (
+              k.toLowerCase().includes(q) ||
+              list.some(
+                (e) =>
+                  e.title?.toLowerCase().includes(q) ||
+                  e.msg?.toLowerCase().includes(q) ||
+                  e.data?.file?.toLowerCase?.().includes(q)
+              )
+            );
+          })
+          .map(([k, list], i) => (
+            <React.Fragment key={i}>
+              <a
+                onClick={() => {
+                  if (list.length === 1) {
+                    window.history.pushState({ view: "log" }, "");
+                    setSelected(list[0]);
+                  } else {
+                    window.history.pushState({ view: "group" }, "");
+                    setGroupView(list);
+                  }
+                }}
+              >
+                <b>[{list[0].ts.toLocaleString()}]</b> {list[0].title}
+              </a>
+              <br />
+            </React.Fragment>
+          ))}
     </div>
   );
 }
 
-const container = document.getElementById("root");
+const container = document.getElementById("root") as Element;
 const root = ReactDOM.createRoot(container);
 root.render(<MyApp />);

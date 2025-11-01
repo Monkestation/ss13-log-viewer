@@ -630,6 +630,7 @@ function MyApp() {
               >
                 <b>[{list[0].ts.toLocaleString()}]</b> {list[0].title}
               </a>
+              {list.length > 1 && <>x{list.length}</>}
               <br />
             </React.Fragment>
           ))}

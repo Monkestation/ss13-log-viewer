@@ -18,6 +18,7 @@ TODO:
 - [ ] Add key combinations for copying and stuff
 - - Hold shift or alt to show keys for buttons.
 - [ ] Add "case sensitive" option for regexs
+- [ ] Order should be: In order -> Alphabetically -> Most occurances (if in organized/group mode)
 
 # LICESNSE
 

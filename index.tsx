@@ -209,9 +209,18 @@ function LogDetail({
       </a>
       <br />
       <a onClick={() => navigator.clipboard.writeText(entry.msg)}>Copy Log</a>
-      <a onClick={() => navigator.clipboard.writeText(logToMarkdown(entry))}>(Markdown)</a> |
+      <a onClick={() => navigator.clipboard.writeText(logToMarkdown(entry))}>(Markdown)</a> |{" "}
       <a onClick={() => navigator.clipboard.writeText(JSON.stringify(entry.originalLine))}>Copy Raw Log</a>
       <a onClick={() => navigator.clipboard.writeText(JSON.stringify(entry.originalLine, null, "  "))}>(Formatted)</a>
+      {!!entry?.data?.file && (
+        <React.Fragment>
+          {" | "}Copy file/line:
+          <a onClick={() => navigator.clipboard.writeText(`${entry.data.file}:${entry.data.line}`)}>P:#</a>{" "}
+          <a onClick={() => navigator.clipboard.writeText(`${entry.data.file}:L${entry.data.line}`)}>P:L#</a>{" "}
+          <a onClick={() => navigator.clipboard.writeText(`${entry.data.file},${entry.data.line}`)}>P,#</a>
+          <a onClick={() => navigator.clipboard.writeText(`${entry.data.file},L${entry.data.line}`)}>P,L#</a>
+        </React.Fragment>
+      )}
       {inGroup && (
         <>
           <br />
@@ -220,7 +229,7 @@ function LogDetail({
             Next
           </a>
           <span>
-            Runtime {groupIndex + 1} of {total}
+            {groupIndex + 1} of {total} in Group
           </span>
         </>
       )}

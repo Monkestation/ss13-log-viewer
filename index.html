@@ -31,6 +31,7 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/marked@16.4.1/lib/marked.umd.js"></script>
     <style>
       body {
         padding: 0;
@@ -548,9 +549,14 @@
     <div class="uiTitleWrapper">
       <div class="uiTitle">
         <tt>SS13 JSON Log Viewer</tt> |
-        <a href="https://github.com/Monkestation/ss13-log-viewer" target="_blank" rel="noopener noreferrer"
-          >Source Code</a
-        >
+        <span style="font-family: Verdana, Geneva, Tahoma, sans-serif; font-size: 12px">
+          <a href="https://github.com/Monkestation/ss13-log-viewer" target="_blank" rel="noopener noreferrer"
+            >Source Code</a
+          >
+          <!-- TODO: add modal code for a readme -->
+          <!-- |
+          <a href="#">?</a> -->
+        </span>
       </div>
     </div>
     <div id="root" class="uiContent"></div>

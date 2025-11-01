@@ -361,15 +361,35 @@ function MyApp() {
     const map = new Map<string, ParsedLog[]>();
     for (const e of logs) {
       if (ignoreNonRuntimes && !e.msg?.includes("runtime error")) continue;
-
+      let customKey = false;
       let key: string;
-      if (typeof e?.title === "string" && e?.title?.startsWith("## TESTING: GC: --")) {
-        key = "## TESTING: GC...";
-      } else {
+      if (typeof e?.title === "string")
+        if (e.title.startsWith("## TESTING: GC")) key = "## TESTING: GC...";
+        else if (e.title.startsWith("DEBUG: isbanned():")) key = "DEBUG: isbanned(): ...";
+        else if (e.title.startsWith("## ERROR: Prefs failed to setup (SS)"))
+          key = "## ERROR: Prefs failed to setup (SS)...";
+        else if (e.title.startsWith("## ERROR: Prefs failed to setup (datum)"))
+          key = "## ERROR: Prefs failed to setup (datum)...";
+        else if (
+          e.title.match(/(\[S\d+-\d+\/\d+\] )?Initialized [\w ]+ subsystem within ([+-]?(\d*\.)?\d+)+ seconds!/i)
+        )
+          key = "Initialized ... subsystem within ... seconds";
+        else if (e.title.match(/Shutting down [\w ]+ subsystem/i)) key = "Shutting down ... subsystem.";
+
+      if (!key) {
         key = e.data?.file ? `${e.data.file}:${e.data.line}` : e.title;
+      } else {
+        customKey = true;
       }
 
-      if (!map.has(key)) map.set(key, []);
+      if (!map.has(key)) {
+        const e = [];
+        // @ts-expect-error You can just. do things. ya know? yeah! you can just fuckin do shit! with javascript! isnt it cool?
+        // the linters wont like you but nothing stops you from using an array like an object.
+        // reminds me of something.....
+        e.customKey = customKey;
+        map.set(key, e);
+      }
       map.get(key)!.push(e);
     }
 
@@ -637,7 +657,7 @@ function MyApp() {
                   }
                 }}
               >
-                <b>[{list[0].ts.toLocaleString()}]</b> {k}
+                <b>[{list[0].ts.toLocaleString()}]</b> {list.customKey ? k : list[0].title}
               </a>
               {list.length > 1 && <>x{list.length}</>}
               <br />

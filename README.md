@@ -1,5 +1,5 @@
 
-# SS13 Web JSON Log/Runtime viewer
+# [SS13 Web JSON Log/Runtime viewer](https://monkestation.github.io/ss13-log-viewer/)
 
 A React log viewer for TG's style of SS13 logs, primarily oriented around runtimes, based on the in-game runtime viewer.
 

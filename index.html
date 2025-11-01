@@ -26,6 +26,7 @@
 
     <meta name="theme-color" content="#7A89BF" />
 
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
@@ -60,6 +61,10 @@
         padding: 1px 4px 1px 4px;
         margin: 0 2px 0 0;
         cursor: default;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
       }
 
       a:hover {
@@ -447,12 +452,105 @@
         display: inline-block;
       }
     </style>
+    <style>
+      .toastify {
+        display: flex;
+        align-items: center;
+        flex-flow: row-reverse;
+        color: #ffffff;
+        background: #383838;
+        position: fixed;
+        opacity: 0;
+        font-family: Verdana, Geneva, sans-serif;
+        transition: all 0.2s cubic-bezier(0.215, 0.61, 0.355, 1);
+        cursor: pointer;
+        text-decoration: none;
+        height: 32px;
+        max-width: calc(50% - 20px);
+        z-index: 2147483647;
+        padding-left: 1rem;
+        padding-right: calc(45px + 1rem);
+      }
+
+      .toastify.on {
+        opacity: 1;
+      }
+
+      .toast-close {
+        background: #434343;
+        border: 0;
+        color: white;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 1em;
+        padding: 0 5px;
+        position: absolute;
+        margin: 0;
+        right: 0;
+        width: 45px;
+        height: 32px;
+        font-size: 15px;
+        line-height: 31px;
+        text-align: center;
+        transition: all 0.2s cubic-bezier(0.215, 0.61, 0.355, 1);
+      }
+
+      .toast-close:hover {
+        background-color: #cc0000;
+      }
+
+      .toastify-right {
+        right: 15px;
+      }
+
+      .toastify-left {
+        left: 15px;
+      }
+
+      .toastify-top {
+        top: -150px;
+      }
+
+      .toastify-bottom {
+        bottom: -150px;
+      }
+
+      .toastify-avatar {
+        width: 1.5em;
+        height: 1.5em;
+        margin: -7px 5px;
+        border-radius: 2px;
+      }
+
+      .toastify-center {
+        margin-left: auto;
+        margin-right: auto;
+        left: 0;
+        right: 0;
+        max-width: fit-content;
+        max-width: -moz-fit-content;
+      }
+
+      @media only screen and (max-width: 360px) {
+        .toastify-right,
+        .toastify-left {
+          margin-left: auto;
+          margin-right: auto;
+          left: 0;
+          right: 0;
+          max-width: fit-content;
+        }
+      }
+    </style>
   </head>
 
   <body>
     <div class="uiTitleWrapper">
       <div class="uiTitle">
-        <tt>SS13 JSON Log Viewer</tt> | <a href="https://github.com/Monkestation/ss13-log-viewer">Source Code</a>
+        <tt>SS13 JSON Log Viewer</tt> |
+        <a href="https://github.com/Monkestation/ss13-log-viewer" target="_blank" rel="noopener noreferrer"
+          >Source Code</a
+        >
       </div>
     </div>
     <div id="root" class="uiContent"></div>

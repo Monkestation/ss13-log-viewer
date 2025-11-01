@@ -1,5 +1,7 @@
 const React = globalThis.React as typeof import("react");
 const ReactDOM = globalThis.ReactDOM as unknown as typeof import("react-dom/client");
+const Toastify = globalThis.Toastify as typeof import("toastify-js");
+
 interface LogRuntimeData {
   file: string;
   line: number;
@@ -70,6 +72,23 @@ function parseLogLine(line: JSONLogLine): ParsedLog {
   };
 }
 
+function censorLog(log: string) {
+  return log.replace(
+    /(?<name>[\w ]+) \((?<typepath>\/mob(?:\/\w+)*|\/client|\/datum\/persistent_client)\)/gim,
+    "[redacted] ($2)"
+  );
+}
+
+function quickToast(text: string, duration: number = 5000) {
+  Toastify({
+    text,
+    duration: duration,
+    close: true,
+    gravity: "bottom",
+    position: "left",
+    stopOnFocus: true,
+  }).showToast();
+}
 // copmonents
 
 function WStateDisplay({ w }) {
@@ -196,6 +215,7 @@ function LogDetail({
   logs,
   groupList,
   groupIndex,
+  specials,
   onNavigate,
 }: {
   entry: ParsedLog;
@@ -204,11 +224,54 @@ function LogDetail({
   logs: ParsedLog[];
   groupList: ParsedLog[];
   groupIndex: number;
+  specials: boolean;
   onNavigate: Function;
 }) {
   const inGroup = Array.isArray(groupList) && groupList.length > 1;
   const total = inGroup ? groupList.length : 1;
   const logsTotal = logs.length;
+
+  const handleCopy = (e: React.MouseEvent, text: string, supportCensor = false) => {
+    navigator.clipboard.writeText(specials && supportCensor ? censorLog(text) : text);
+    quickToast(supportCensor ? "Copied censored text to clipboard." : "Copied to clipboard.", 5000);
+  };
+
+  const copyLogButtons = [
+    { label: "Copy Log", text: entry.msg },
+    { label: "(Markdown)", text: logToMarkdown(entry) },
+    null,
+    { label: "Copy Raw Log", text: JSON.stringify(entry.originalLine) },
+    { label: "(Formatted)", text: JSON.stringify(entry.originalLine, null, "  ") },
+  ];
+
+  const fileLineButtons = entry?.data?.file
+    ? [
+        { label: "P:#", text: `${entry.data.file}:${entry.data.line}` },
+        { label: "P:L#", text: `${entry.data.file}:L${entry.data.line}` },
+        { label: "P,#", text: `${entry.data.file},${entry.data.line}` },
+        { label: "P,L#", text: `${entry.data.file},L${entry.data.line}` },
+      ]
+    : [];
+
+  const wstateButtons = entry.wstate
+    ? [
+        { label: "Copy", text: WStateText(entry.wstate) },
+        { label: "Copy Raw", text: JSON.stringify(entry.wstate) },
+        { label: "(Formatted)", text: JSON.stringify(entry.wstate, null, "  ") },
+      ]
+    : [];
+
+  const extraDataButtons =
+    entry.data && Object.keys(entry.data).length > 0
+      ? [
+          { label: "Copy", text: dataToText(entry.data, ["desc"]) },
+          { label: "(Markdown)", text: dataToMarkdown(entry.data, ["desc"]) },
+          null,
+          { label: "Copy Raw", text: JSON.stringify(entry.data) },
+          { label: "(Formatted)", text: JSON.stringify(entry.data, null, "  ") },
+        ]
+      : [];
+
   return (
     <div>
       <a onClick={onBack}>
@@ -218,19 +281,27 @@ function LogDetail({
         Entry #{logIndex + 1} of {logsTotal}
       </span>
       <br />
-      <a onClick={() => navigator.clipboard.writeText(entry.msg)}>Copy Log</a>
-      <a onClick={() => navigator.clipboard.writeText(logToMarkdown(entry))}>(Markdown)</a> |{" "}
-      <a onClick={() => navigator.clipboard.writeText(JSON.stringify(entry.originalLine))}>Copy Raw Log</a>
-      <a onClick={() => navigator.clipboard.writeText(JSON.stringify(entry.originalLine, null, "  "))}>(Formatted)</a>
-      {!!entry?.data?.file && (
-        <React.Fragment>
-          {" | "}Copy file/line:
-          <a onClick={() => navigator.clipboard.writeText(`${entry.data.file}:${entry.data.line}`)}>P:#</a>{" "}
-          <a onClick={() => navigator.clipboard.writeText(`${entry.data.file}:L${entry.data.line}`)}>P:L#</a>{" "}
-          <a onClick={() => navigator.clipboard.writeText(`${entry.data.file},${entry.data.line}`)}>P,#</a>
-          <a onClick={() => navigator.clipboard.writeText(`${entry.data.file},L${entry.data.line}`)}>P,L#</a>
-        </React.Fragment>
+      {copyLogButtons.map((btn, idx) => {
+        if (btn === null) {
+          return " | ";
+        } else
+          return (
+            <React.Fragment key={idx}>
+              <a onClick={(e) => handleCopy(e, btn.text, true)}>{btn.label}</a>{" "}
+            </React.Fragment>
+          );
+      })}
+      {fileLineButtons.length > 0 && (
+        <>
+          {" | "}Copy file/line:{" "}
+          {fileLineButtons.map((btn, idx) => (
+            <React.Fragment key={idx}>
+              <a onClick={(e) => handleCopy(e, btn.text)}>{btn.label}</a>{" "}
+            </React.Fragment>
+          ))}
+        </>
       )}
+      {specials ? " | Copies will be censored (Ckeys, mob names, clients) (May not always work)" : ""}
       {inGroup && (
         <>
           <br />
@@ -247,28 +318,36 @@ function LogDetail({
       <b>[{entry.ts.toLocaleString()}]</b> {entry.title}
       <br />
       <pre className="runtime">{entry.msg}</pre>
-      {!!entry.wstate && (
-        <React.Fragment>
+      {entry.wstate && (
+        <>
           <h2>WState</h2>
-          <a onClick={() => navigator.clipboard.writeText(WStateText(entry.wstate!))}>Copy</a> |{" "}
-          <a onClick={() => navigator.clipboard.writeText(JSON.stringify(entry.wstate))}>Copy Raw</a>
-          <a onClick={() => navigator.clipboard.writeText(JSON.stringify(entry.wstate, null, "  "))}>(Formatted)</a>
+          {wstateButtons.map((btn, idx) => (
+            <React.Fragment key={idx}>
+              <a onClick={(e) => handleCopy(e, btn.text)}>{btn.label}</a>{" "}
+            </React.Fragment>
+          ))}
           <WStateDisplay w={entry.wstate} />
           <br />
-        </React.Fragment>
+        </>
       )}
-      {!!(entry.data && Object.keys(entry.data).length > 0) && (
-        <React.Fragment>
+      {extraDataButtons.length > 0 && (
+        <>
           <hr />
           <h2>Extra Data</h2>
           Omits <code>"desc"</code>
           <br />
-          <a onClick={() => navigator.clipboard.writeText(dataToText(entry.data, ["desc"]))}>Copy</a>
-          <a onClick={() => navigator.clipboard.writeText(dataToMarkdown(entry.data, ["desc"]))}>(Markdown)</a> |{" "}
-          <a onClick={() => navigator.clipboard.writeText(JSON.stringify(entry.data))}>Copy Raw</a>
-          <a onClick={() => navigator.clipboard.writeText(JSON.stringify(entry.data, null, "  "))}>(Formatted)</a>
+          {extraDataButtons.map((btn, idx) =>
+            btn === null ? (
+              <>{" | "}</>
+            ) : (
+              <React.Fragment key={idx}>
+                <a onClick={(e) => handleCopy(e, btn.text, true)}>{btn.label}</a>{" "}
+              </React.Fragment>
+            )
+          )}
+          {specials ? " | Copies will be censored (Ckeys, mob names, clients) (May not always work)" : ""}
           <ExtraDataDisplay data={entry.data} omit={["desc"] as unknown as keyof ParsedLog[]} />
-        </React.Fragment>
+        </>
       )}
     </div>
   );
@@ -356,6 +435,8 @@ function MyApp() {
   const [searchQuery, setSearchQuery] = React.useState<string>("");
   const [searchUseRegex, setSearchUseRegex] = React.useState<boolean>(false);
   const searchRef = React.useRef<HTMLInputElement>(null);
+  // holding down shift, basically.
+  const [showSpecials, setShowSpecials] = React.useState(false);
 
   const runtimes = React.useMemo(() => {
     const map = new Map<string, ParsedLog[]>();
@@ -438,7 +519,10 @@ function MyApp() {
   // space - search box
   // arrow keys (only in runtimes) - navigate between runtimes
   React.useEffect(() => {
-    function handleKey(e) {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Shift") {
+        setShowSpecials(true);
+      }
       if (e.key === "Enter" && !selected && !groupView && !e.target.matches("input, textarea")) {
         e.preventDefault();
         searchRef.current?.focus();
@@ -480,8 +564,18 @@ function MyApp() {
       }
     }
 
+    function handleKeyUp(e: KeyboardEvent) {
+      if (e.key === "Shift") {
+        setShowSpecials(false);
+      }
+    }
+
     window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKey);
+      window.removeEventListener("keydown", handleKeyUp);
+    };
   }, [selected, groupList, groupIndex, logs]);
 
   if (selected)
@@ -494,6 +588,7 @@ function MyApp() {
         // It will never be null since groupList is set in the onClick for items in the groupView.
         groupList={groupList!}
         groupIndex={groupIndex}
+        specials={showSpecials}
         onNavigate={(newIndex) => {
           setGroupIndex(newIndex);
           // same here

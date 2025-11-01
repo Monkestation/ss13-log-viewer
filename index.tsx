@@ -361,7 +361,14 @@ function MyApp() {
     const map = new Map<string, ParsedLog[]>();
     for (const e of logs) {
       if (ignoreNonRuntimes && !e.msg?.includes("runtime error")) continue;
-      const key = e.data?.file ? `${e.data.file}:${e.data.line}` : e.title;
+
+      let key: string;
+      if (typeof e?.title === "string" && e?.title?.startsWith("## TESTING: GC: --")) {
+        key = "## TESTING: GC...";
+      } else {
+        key = e.data?.file ? `${e.data.file}:${e.data.line}` : e.title;
+      }
+
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(e);
     }
@@ -630,7 +637,7 @@ function MyApp() {
                   }
                 }}
               >
-                <b>[{list[0].ts.toLocaleString()}]</b> {list[0].title}
+                <b>[{list[0].ts.toLocaleString()}]</b> {k}
               </a>
               {list.length > 1 && <>x{list.length}</>}
               <br />

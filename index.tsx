@@ -746,6 +746,7 @@ function MyApp() {
                   if (list.length === 1) {
                     window.history.pushState({ view: "log" }, "");
                     setSelected(list[0]);
+                    setGroupList(null);
                   } else {
                     window.history.pushState({ view: "group" }, "");
                     setGroupView(list);

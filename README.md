@@ -5,11 +5,18 @@ A React log viewer for TG's style of SS13 logs, primarily oriented around runtim
 
 ![A preview showing the log viewer](preview.gif)
 
-- Supports Organized/Linear viewing
-- Allows you to ignore non-runtimes
+- Supports Organized/Linear viewing; ignore non-runtimes (lots of sorting options, just uhh look at the thing.)
+- Support for hash params:
+- - `organized`, `sort_logs`, `sort_ascending`, `ignore_non_runtimes`, `search_use_regex`
+- Support for search via hash param `search`
+- Support for raw logs via hash param `log_text`, and file name title `log_name`
 - yah dats pretty much it rn
 
-TODO: 
+## key handling:
+space - search box
+arrow keys (only in runtimes) - navigate between runtimes
+
+## TODO: 
 - [x] Add a search function
 - [ ] Add pagination probably
 - [ ] Try parsing other kinds of logs, not just runtimes.
@@ -20,6 +27,7 @@ TODO:
 - [ ] Add "case sensitive" option for regexs
 - [ ] Order should be: In order -> Alphabetically -> Most occurances (if in organized/group mode)
 
-# LICESNSE
 
-This project is licesnsed under the [MIT license](LICENSE.md)
+# LICENSE
+
+This project is licensed under the [MIT license](LICENSE.md)

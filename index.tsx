@@ -7,6 +7,8 @@ interface LogRuntimeData {
   line: number;
   name: string;
   desc: string;
+  data?: string;
+  [key: string]: any;
 }
 interface WState {
   tick_usage: number;
@@ -34,7 +36,7 @@ interface ParsedLog {
   cat: string;
   msg: string;
   title: string;
-  data: null | any | LogRuntimeData;
+  data: LogRuntimeData | null;
   wstate: WState | undefined;
   id: number | undefined;
   originalLine: JSONLogLine;
@@ -91,7 +93,7 @@ function quickToast(text: string, duration: number = 5000) {
 }
 // copmonents
 
-function WStateDisplay({ w }) {
+function WStateDisplay({ w }: { w: WState }) {
   if (!w) return null;
   return (
     <div className="statusDisplay">
@@ -117,7 +119,7 @@ function WStateText(w: NonNullable<ParsedLog["wstate"]>) {
   );
 }
 
-function DataEntry({ key, label, value }) {
+function DataEntry({ key, label, value }: { key: string; label: string; value: string }) {
   if (value !== null && typeof value !== "object") {
     return (
       <React.Fragment key={key}>
@@ -167,25 +169,25 @@ function DataEntry({ key, label, value }) {
   );
 }
 
-function dataToText<T = object>(e: T, omit: (keyof T)[]) {
-  let sports = "";
-  for (const a of Object.keys(e as object)) {
-    if (omit.includes(a as keyof T)) continue;
-    sports += `${a}: ${e[a]}\n`;
+function dataToText<T extends Record<string, unknown>>(data: T, omit: readonly (keyof T)[]): string {
+  let out = "";
+  for (const key in data) {
+    if (omit.includes(key)) continue;
+    out += `${key}: ${String(data[key])}\n`;
   }
-  return sports;
+  return out;
 }
 
-function dataToMarkdown<T = object>(e: T, omit: (keyof T)[]) {
-  let sports = "";
-  for (const a of Object.keys(e as object)) {
-    if (omit.includes(a as keyof T)) continue;
-    sports += `${a}: \`${e[a]}\`\n`;
+function dataToMarkdown<T extends Record<string, unknown>>(data: T, omit: readonly (keyof T)[]): string {
+  let out = "";
+  for (const key in data) {
+    if (omit.includes(key)) continue;
+    out += `${key}: \`${String(data[key])}\`\n`;
   }
-  return sports;
+  return out;
 }
 
-function ExtraDataDisplay({ data, omit }) {
+function ExtraDataDisplay({ data, omit }: { data: LogRuntimeData; omit: keyof ParsedLog }) {
   if (!data || typeof data !== "object") return null;
 
   const keys = Object.keys(data);
@@ -225,7 +227,7 @@ function LogDetail({
   groupList: ParsedLog[];
   groupIndex: number;
   specials: boolean;
-  onNavigate: Function;
+  onNavigate: (param: number) => void;
 }) {
   const inGroup = Array.isArray(groupList) && groupList.length > 1;
   const total = inGroup ? groupList.length : 1;
@@ -346,14 +348,14 @@ function LogDetail({
             )
           )}
           {specials ? " | Copies will be censored (Ckeys, mob names, clients) (May not always work)" : ""}
-          <ExtraDataDisplay data={entry.data} omit={["desc"] as unknown as keyof ParsedLog[]} />
+          <ExtraDataDisplay data={entry.data!} omit={["desc"] as unknown as keyof ParsedLog} />
         </>
       )}
     </div>
   );
 }
 
-function UploadButton({ onUpload }) {
+function UploadButton({ onUpload }: { onUpload: (result: ParsedLog[], filename: string) => void }) {
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -384,12 +386,12 @@ function UploadButton({ onUpload }) {
   }
   const inputRef = React.useRef<HTMLInputElement>(null);
 
-  const handleUploadClick = (e) => {
+  const handleUploadClick = (e: React.SyntheticEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     inputRef.current?.click();
   };
 
-  const handleExampleClick = async (e) => {
+  const handleExampleClick = async (e: React.SyntheticEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     try {
       const res = await fetch("example_log.json");
@@ -419,6 +421,15 @@ function UploadButton({ onUpload }) {
   );
 }
 
+// for search params
+const truthy = new Set(["1", "true", "yes", ""]);
+
+function readBool(params: URLSearchParams, key: string): boolean | null {
+  const v = params.get(key);
+  if (v === null) return null;
+  return truthy.has(v.toLowerCase());
+}
+
 function MyApp() {
   // no i will NOT use react router FUCK YOU! :3
   const [logs, setLogs] = React.useState<ParsedLog[]>([]);
@@ -443,7 +454,7 @@ function MyApp() {
     for (const e of logs) {
       if (ignoreNonRuntimes && !e.msg?.includes("runtime error")) continue;
       let customKey = false;
-      let key: string;
+      let key: string | undefined = undefined;
       if (typeof e?.title === "string")
         if (e.title.startsWith("## TESTING: GC")) key = "## TESTING: GC...";
         else if (e.title.startsWith("DEBUG: isbanned():")) key = "DEBUG: isbanned(): ...";
@@ -464,7 +475,7 @@ function MyApp() {
       }
 
       if (!map.has(key)) {
-        const e = [];
+        const e: ParsedLog[] = [];
         // @ts-expect-error You can just. do things. ya know? yeah! you can just fuckin do shit! with javascript! isnt it cool?
         // the linters wont like you but nothing stops you from using an array like an object.
         // reminds me of something.....
@@ -523,13 +534,13 @@ function MyApp() {
       if (e.key === "Shift") {
         setShowSpecials(true);
       }
-      if (e.key === "Enter" && !selected && !groupView && !e.target.matches("input, textarea")) {
+      if (e.key === "Enter" && !selected && !groupView && !(e.target as Element).matches("input, textarea")) {
         e.preventDefault();
         searchRef.current?.focus();
         return;
       }
 
-      if (e.key === "Backspace" && !e.target.matches("input, textarea")) {
+      if (e.key === "Backspace" && !(e.target as Element).matches("input, textarea")) {
         e.preventDefault();
         window.history.back();
         return;
@@ -577,6 +588,46 @@ function MyApp() {
       window.removeEventListener("keydown", handleKeyUp);
     };
   }, [selected, groupList, groupIndex, logs]);
+
+  React.useEffect(() => {
+    if (!window.location.hash || window.location.hash.length <= 1) return;
+
+    try {
+      const params = new URLSearchParams(window.location.hash.slice(1));
+
+      const organized = readBool(params, "organized");
+      if (organized !== null) setOrganized(organized);
+
+      const sortLogs = readBool(params, "sort_logs");
+      if (sortLogs !== null) setSortLogs(sortLogs);
+
+      const sortAscending = readBool(params, "sort_ascending");
+      if (sortAscending !== null) setSortAscending(sortAscending);
+
+      const ignoreNonRuntimes = readBool(params, "ignore_non_runtimes");
+      if (ignoreNonRuntimes !== null) setIgnoreNonRuntimes(ignoreNonRuntimes);
+
+      const search = params.get("search");
+      if (search !== null) setSearchQuery(search);
+
+      const searchUseRegex = readBool(params, "search_use_regex");
+      if (searchUseRegex !== null) setSearchUseRegex(searchUseRegex);
+
+      const logText = params.get("log_text");
+      const logName = params.get("log_name");
+
+      if (logText) {
+        const lines = logText.split(/\r?\n/).filter(Boolean);
+        const parsed = lines
+          .map(safeJSONParse<JSONLogLine>)
+          .filter(Boolean)
+          .map((v) => parseLogLine(v!));
+
+        setLogs(parsed);
+        if (logName) setUploadFileName(logName);
+      }
+    } catch {}
+  }, []);
 
   if (selected)
     return (
@@ -633,7 +684,7 @@ function MyApp() {
   return (
     <div>
       <UploadButton
-        onUpload={(result: ParsedLog[], filename: string) => {
+        onUpload={(result, filename) => {
           setLogs(result);
           setUploadFileName(filename);
         }}
@@ -753,6 +804,7 @@ function MyApp() {
                   }
                 }}
               >
+                {/* @ts-expect-error previous ts-expect-error :3  */}
                 <b>[{list[0].ts.toLocaleString()}]</b> {list.customKey ? k : list[0].title}
               </a>
               {list.length > 1 && <>x{list.length}</>}

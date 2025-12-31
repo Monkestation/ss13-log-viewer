@@ -449,12 +449,16 @@ function MyApp() {
   // holding down shift, basically.
   const [showSpecials, setShowSpecials] = React.useState(false);
 
+  // hash param only states
+  const [uploadDisabled, setUploadDisabled] = React.useState(false);
+
   const runtimes = React.useMemo(() => {
     const map = new Map<string, ParsedLog[]>();
     for (const e of logs) {
       if (ignoreNonRuntimes && !e.msg?.includes("runtime error")) continue;
       let customKey = false;
       let key: string | undefined = undefined;
+      // this is for collapsing logs that have similar structure but much different
       if (typeof e?.title === "string")
         if (e.title.startsWith("## TESTING: GC")) key = "## TESTING: GC...";
         else if (e.title.startsWith("DEBUG: isbanned():")) key = "DEBUG: isbanned(): ...";
@@ -594,25 +598,23 @@ function MyApp() {
 
     try {
       const params = new URLSearchParams(window.location.hash.slice(1));
+      const boolSetHelper = (param: string, cb: (val: boolean) => void) => {
+        const parm = readBool(params, param);
+        if (parm !== null) cb(parm);
+      };
 
-      const organized = readBool(params, "organized");
-      if (organized !== null) setOrganized(organized);
-
-      const sortLogs = readBool(params, "sort_logs");
-      if (sortLogs !== null) setSortLogs(sortLogs);
-
-      const sortAscending = readBool(params, "sort_ascending");
-      if (sortAscending !== null) setSortAscending(sortAscending);
-
-      const ignoreNonRuntimes = readBool(params, "ignore_non_runtimes");
-      if (ignoreNonRuntimes !== null) setIgnoreNonRuntimes(ignoreNonRuntimes);
+      boolSetHelper("organized", (v) => setOrganized(v));
+      boolSetHelper("sort_logs", (v) => setSortLogs(v));
+      boolSetHelper("sort_ascending", (v) => setSortAscending(v));
+      boolSetHelper("ignore_non_runtimes", (v) => setIgnoreNonRuntimes(v));
+      boolSetHelper("search_use_regex", (v) => setSearchUseRegex(v));
+      boolSetHelper("disable_upload", (v) => setUploadDisabled(v));
+      boolSetHelper("enable_back_button", (v) => {
+        document.getElementById("uiBack")!.style.removeProperty("display");
+      });
 
       const search = params.get("search");
       if (search !== null) setSearchQuery(search);
-
-      const searchUseRegex = readBool(params, "search_use_regex");
-      if (searchUseRegex !== null) setSearchUseRegex(searchUseRegex);
-
       const logText = params.get("log_text");
       const logName = params.get("log_name");
 
@@ -683,12 +685,14 @@ function MyApp() {
 
   return (
     <div>
-      <UploadButton
-        onUpload={(result, filename) => {
-          setLogs(result);
-          setUploadFileName(filename);
-        }}
-      />
+      {!uploadDisabled && (
+        <UploadButton
+          onUpload={(result, filename) => {
+            setLogs(result);
+            setUploadFileName(filename);
+          }}
+        />
+      )}
       {uploadFileName}
       <br />
       {logs.length} Logs

@@ -54,12 +54,33 @@ function safeJSONParse<T>(line: string): T | null {
 const PROC_PATH_REGEX = /proc name: [\w ]*\((.*)\)/;
 
 function parseLogLine(line: JSONLogLine): ParsedLog {
+  console.log(line);
   let firstLine = line.msg?.split("\n")[0] ?? "(no message)";
+  const SOURCE_FILE_REGEX = /^\s*source file:\s+(.+),(\d+)$/m;
+
+  let file = line.data?.file;
+  let lineNumber = line.data?.line;
+
+  if (!file || !lineNumber) {
+    const match = SOURCE_FILE_REGEX.exec(line.msg ?? "");
+    if (match) {
+      file = match[1];
+      lineNumber = Number(match[2]);
+    }
+  }
+
   if (firstLine === "runtime error: ") {
-    const procname = line.msg!.split("\n").filter((e) => e.includes("proc name"))[0];
-    firstLine = `Runtime in ${line.data.file}, line ${line.data.line}: ${PROC_PATH_REGEX.exec(procname)![1]}`;
+    const procname = line.msg!.split("\n").find((e) => e.includes("proc name")) ?? "";
+    firstLine = `Runtime in ${file}, line ${lineNumber}: ${PROC_PATH_REGEX.exec(procname)?.[1] ?? "Unknown"}`;
   } else if (firstLine.includes("runtime error: ")) {
-    firstLine = `Runtime in ${line.data.file}, line ${line.data.line}: ${line.data.name}`;
+    firstLine = `Runtime in ${file}, line ${lineNumber}: ${line.data?.name ?? "Unknown"}`;
+  }
+
+  if (!line.data) {
+    line.data = {
+      file,
+      line: lineNumber,
+    };
   }
   return {
     ts: new Date(line.ts),

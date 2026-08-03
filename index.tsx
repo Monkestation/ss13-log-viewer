@@ -55,13 +55,15 @@ const PROC_PATH_REGEX = /proc name: [\w ]*\((.*)\)/;
 
 function parseLogLine(line: JSONLogLine): ParsedLog {
   console.log(line);
+
   let firstLine = line.msg?.split("\n")[0] ?? "(no message)";
+
   const SOURCE_FILE_REGEX = /^\s*source file:\s+(.+),(\d+)$/m;
 
   let file = line.data?.file;
   let lineNumber = line.data?.line;
 
-  if (!file || !lineNumber) {
+  if (!file || lineNumber == null) {
     const match = SOURCE_FILE_REGEX.exec(line.msg ?? "");
     if (match) {
       file = match[1];
@@ -69,11 +71,28 @@ function parseLogLine(line: JSONLogLine): ParsedLog {
     }
   }
 
-  if (firstLine === "runtime error: ") {
-    const procname = line.msg!.split("\n").find((e) => e.includes("proc name")) ?? "";
-    firstLine = `Runtime in ${file}, line ${lineNumber}: ${PROC_PATH_REGEX.exec(procname)?.[1] ?? "Unknown"}`;
-  } else if (firstLine.includes("runtime error: ")) {
-    firstLine = `Runtime in ${file}, line ${lineNumber}: ${line.data?.name ?? "Unknown"}`;
+  const isRuntime = /^runtime error:/m.test(line.msg ?? "");
+
+  if (isRuntime) {
+    let proc = "Unknown";
+
+    const lines = (line.msg ?? "").split("\n");
+    const callStackIndex = lines.findIndex((l) => l.trim() === "call stack:");
+
+    if (callStackIndex !== -1) {
+      for (let i = callStackIndex + 1; i < lines.length; i++) {
+        const frame = lines[i].trim();
+
+        if (frame.startsWith("stack trace(") || frame.startsWith("_stack_trace(")) {
+          continue;
+        }
+        proc = frame.replace(/\(.*/, "").trim();
+
+        break;
+      }
+    }
+    const runtimeMessage = line.msg?.match(/^runtime error:\s*(.+)$/m)?.[1] ?? "Unknown runtime";
+    firstLine = `Runtime in ${file ?? "Unknown"}, line ${lineNumber ?? "?"}: ${runtimeMessage}`;
   }
 
   if (!line.data) {
@@ -81,7 +100,11 @@ function parseLogLine(line: JSONLogLine): ParsedLog {
       file,
       line: lineNumber,
     };
+  } else {
+    line.data.file ??= file;
+    line.data.line ??= lineNumber;
   }
+
   return {
     ts: new Date(line.ts),
     round_id: line.round_id ?? "?",
